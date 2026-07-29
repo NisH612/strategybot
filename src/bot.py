@@ -110,6 +110,9 @@ class TradingBot:
             except NotImplementedError:
                 pass  # Windows
 
+        # Send startup status to Discord
+        await self._send_startup_status()
+
         logger.info("Bot running – awaiting candles...")
 
     async def stop(self) -> None:
@@ -128,6 +131,49 @@ class TradingBot:
         self.db.close()
         await self.discord.close()
         logger.info("Bot stopped")
+
+    # ------------------------------------------------------------------
+    # Startup status
+    # ------------------------------------------------------------------
+    async def _send_startup_status(self) -> None:
+        try:
+            balance = await self.exchange.get_balance("USDT")
+        except Exception:
+            balance = 0.0
+
+        pos_info = "None"
+        try:
+            pos = await self.exchange.get_position(self.settings.symbol)
+            if pos:
+                amt = float(pos.get("positionAmt", "0"))
+                entry = float(pos.get("entryPrice", "0"))
+                pnl = float(pos.get("unRealizedProfit", "0"))
+                pos_info = f"{amt:.4f} @ ${entry:.2f} (UPnL: ${pnl:.2f})"
+        except Exception:
+            pass
+
+        embed = {
+            "title": "Bot Started",
+            "color": 0x00FF00,
+            "fields": [
+                {"name": "Pair", "value": self.settings.symbol, "inline": True},
+                {"name": "Timeframe", "value": self.settings.timeframe, "inline": True},
+                {"name": "Network", "value": "TESTNET" if self.settings.testnet else "MAINNET", "inline": True},
+                {"name": "Balance", "value": f"${balance:.2f} USDT", "inline": True},
+                {"name": "Candles Loaded", "value": str(len(self._closes)), "inline": True},
+                {"name": "Open Position", "value": pos_info, "inline": False},
+                {"name": "Market Intel", "value": "Active", "inline": True},
+                {"name": "Confidence Engine", "value": f"Threshold: {self.settings.min_confidence}%", "inline": True},
+                {"name": "REST API", "value": f"http://{self.settings.api_host}:{self.settings.api_port}", "inline": False},
+            ],
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+        try:
+            msg_id = await self.discord.send_message(embed)
+            if msg_id:
+                logger.info("Startup status sent to Discord (msg_id=%s)", msg_id)
+        except Exception as exc:
+            logger.warning("Failed to send startup status: %s", exc)
 
     # ------------------------------------------------------------------
     # Data loading
