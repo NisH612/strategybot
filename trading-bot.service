@@ -1,0 +1,41 @@
+[Unit]
+Description=BTC Trading Bot - Binance Futures EMA Crossover
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/btc_trading_bot
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/home/ubuntu/btc_trading_bot/.env
+
+# Executable (virtual environment)
+ExecStart=/home/ubuntu/btc_trading_bot/.venv/bin/python /home/ubuntu/btc_trading_bot/main.py
+
+# Restart behaviour
+Restart=always
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=60
+
+# Graceful shutdown
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# Security - prevent memory leaks
+MemoryMax=512M
+CPUQuota=80%
+
+# File descriptors
+LimitNOFILE=65535
+
+# Logging
+StandardOutput=append:/home/ubuntu/btc_trading_bot/logs/systemd.log
+StandardError=append:/home/ubuntu/btc_trading_bot/logs/systemd.log
+
+[Install]
+WantedBy=multi-user.target
