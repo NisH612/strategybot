@@ -2,12 +2,13 @@
 
 Automated Binance Futures trading bot with an EMA crossover strategy (10/25/250), market intelligence, confidence scoring, Discord notifications, and a REST API dashboard.
 
-Designed for **24/7 unattended operation** on a Linux VPS (Wispbyte or any Ubuntu/Debian server).
+Designed for **24/7 unattended operation** on a Linux VPS or Docker container.
 
 ---
 
-## Strategy
+## Strategies
 
+### Primary: EMA Crossover
 - **EMA 10 / EMA 25 crossover** with **EMA 250** trend filter
 - **Long**: EMA10 crosses above EMA25 + price above EMA250
 - **Short**: EMA10 crosses below EMA25 + price below EMA250
@@ -16,69 +17,71 @@ Designed for **24/7 unattended operation** on a Linux VPS (Wispbyte or any Ubunt
 - **1-hour timeframe** only
 - **One position at a time**, 100% balance per trade
 
-### Optional Filters (configurable)
-
+### Optional Filters
 - **Confidence scoring** — weighted from OI, funding rate, Fear & Greed, news sentiment, liquidations, market trend (threshold: 70/100)
 - **Risk management** — daily loss limit, consecutive loss limit, spread/volatility checks
 
 ---
 
-## Quick Deploy (Wispbyte / Fresh Ubuntu VPS)
+## Quick Start (Bare Metal)
 
 ```bash
-# 1. Clone
-git clone <repository-url> btc_trading_bot
+git clone https://github.com/NisH612/strategybot.git btc_trading_bot
 cd btc_trading_bot
-
-# 2. Install
 chmod +x *.sh
 ./install.sh
-
-# 3. Configure
 cp .env.example .env
-nano .env                # Fill in API keys, tokens
-
-# 4. Start
+nano .env
 ./start.sh
-
-# 5. Verify
-./healthcheck.sh
-
-# 6. Enable auto-start on boot
-sudo cp trading-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable trading-bot
-sudo systemctl start trading-bot
+./verify_install.sh
 ```
 
 ---
 
-## Manual Setup
+## Wispbyte / Pterodactyl Deployment
 
-### Prerequisites
+### Option 1: Git Clone (Bare Metal)
 
-- Python 3.12+
-- Binance Futures account (testnet or live)
-- Discord application with bot token
-- Linux VPS (recommended: 1GB RAM, 1 vCPU)
-
-### Installation
+Use the Wispbyte file manager or SSH to run:
 
 ```bash
-git clone <repository-url> btc_trading_bot
+git clone https://github.com/NisH612/strategybot.git btc_trading_bot
 cd btc_trading_bot
-
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-mkdir -p data logs
+chmod +x *.sh
+./install.sh
 cp .env.example .env
+nano .env
+./start.sh
 ```
 
-### Configuration
+### Option 2: Docker (Recommended for Pterodactyl)
 
-Edit `.env` with your API keys and preferences. All variables are documented in `.env.example`.
+```bash
+# Build and run
+docker compose up -d --build
+
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
+```
+
+### Option 3: systemd (Auto-start on boot)
+
+```bash
+sudo cp trading-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable trading-bot
+sudo systemctl start trading-bot
+sudo systemctl status trading-bot
+```
+
+---
+
+## Configuration
+
+Edit `.env` with your API keys and preferences:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -90,55 +93,52 @@ Edit `.env` with your API keys and preferences. All variables are documented in 
 | `START_BALANCE` | No | `100` | Virtual balance for position sizing |
 | `DISCORD_TOKEN` | Yes | — | Discord bot token |
 | `DISCORD_CHANNEL_ID` | Yes | — | Discord channel ID |
-| `MIN_CONFIDENCE` | No | `70` | Minimum confidence score (0-100) |
+| `MIN_CONFIDENCE` | No | `70` | Minimum confidence score (0–100) |
 | `MAX_DAILY_LOSS` | No | `0` | Max daily loss (0 = unlimited) |
 | `MAX_CONSECUTIVE_LOSSES` | No | `0` | Max consecutive losses (0 = unlimited) |
 | `API_HOST` | No | `127.0.0.1` | REST API bind address |
 | `API_PORT` | No | `8080` | REST API port |
 
+All variables are documented with comments in `.env.example`.
+
 ---
 
-## Running
+## Management Scripts
 
-### Using start/stop scripts
-
-```bash
-./start.sh       # Start in background
-./stop.sh        # Graceful stop
-./restart.sh     # Restart
-./healthcheck.sh # Check everything
-```
-
-### Using systemd (recommended for production)
-
-```bash
-sudo cp trading-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable trading-bot    # Auto-start on boot
-sudo systemctl start trading-bot     # Start now
-sudo systemctl status trading-bot    # Check status
-sudo journalctl -u trading-bot -f    # Follow logs
-```
+| Script | Purpose |
+|--------|---------|
+| `install.sh` | Full installation (idempotent) |
+| `start.sh` | Start bot in background |
+| `stop.sh` | Graceful stop with escalation |
+| `restart.sh` | Stop then start |
+| `healthcheck.sh` | Runtime health check (PASS/FAIL) |
+| `verify_install.sh` | Pre-startup verification |
 
 ---
 
 ## Viewing Logs
 
 ```bash
-# Application log (all events)
+# All events
 tail -f logs/application.log
 
-# Error log (only errors)
+# Errors only
 tail -f logs/error.log
 
-# Trades log (trade open/close events)
+# Trade open/close events
 tail -f logs/trades.log
 
-# systemd logs (if using systemd)
+# Startup logs
+tail -f logs/startup.log
+
+# Docker logs
+docker compose logs -f
+
+# systemd logs
 journalctl -u trading-bot -f
 ```
 
-Logs are rotated automatically at midnight. Archives are kept for 30 days (configurable via `LOG_BACKUP_COUNT`).
+Logs rotate automatically at midnight. Archives kept for 30 days (configurable via `LOG_BACKUP_COUNT`).
 
 ---
 
@@ -156,64 +156,54 @@ The dashboard runs on `http://127.0.0.1:8080` by default.
 | `/confidence` | Recent decision reports |
 | `/history` | Historical market snapshots |
 
-To access from outside the VPS, use SSH port forwarding:
+Access via SSH tunnel:
 
 ```bash
 ssh -L 8080:127.0.0.1:8080 user@your-vps
 ```
-
-Then open `http://127.0.0.1:8080` in your browser.
 
 ---
 
 ## Updating
 
 ```bash
+# Bare metal
 cd btc_trading_bot
 ./stop.sh
 git pull
-./install.sh        # Re-install dependencies
-sudo systemctl daemon-reload   # If service file changed
+./install.sh
 ./start.sh
+
+# Docker
+docker compose down
+git pull
+docker compose up -d --build
+
+# systemd
+sudo systemctl stop trading-bot
+git pull
+./install.sh
+sudo systemctl start trading-bot
 ```
 
 ---
 
-## Project Structure
+## Recovery
 
-```
-├── main.py                  # Entry point
-├── install.sh               # Installation script
-├── start.sh                 # Startup script
-├── stop.sh                  # Stop script
-├── restart.sh               # Restart script
-├── healthcheck.sh           # Health check script
-├── trading-bot.service      # systemd unit file
-├── logrotate.conf           # Log rotation config
-├── .env.example             # Configuration template
-├── requirements.txt         # Python dependencies
-├── README.md                # This file
-├── LICENSE                  # MIT License
-├── src/
-│   ├── bot.py               # Main orchestrator
-│   ├── config/              # Settings from .env
-│   ├── exchange/            # Binance Futures REST + WebSocket
-│   ├── strategy/            # EMA crossover logic
-│   ├── discord_bot/         # Discord embed notifications
-│   ├── database/            # SQLite trade storage
-│   ├── models/              # Data classes
-│   ├── market_intelligence/ # OI, funding, Fear & Greed, dominance
-│   ├── news/                # News sentiment analysis
-│   ├── confidence/          # Confidence scoring engine
-│   ├── ml/                  # ML dataset preparation
-│   ├── api/                 # REST API dashboard
-│   ├── backtesting/         # Backtesting engine
-│   ├── risk/                # Risk management
-│   └── utils/               # Logger, helpers
-├── data/                    # SQLite database
-├── logs/                    # Log files
-└── tests/                   # Test directory
-```
+The bot automatically recovers from:
+- Internet interruptions
+- Binance API downtime
+- Discord rate limits
+- WebSocket disconnects
+- Database locks
+- Unexpected exceptions
+
+On restart:
+1. Validates configuration before connecting to external services
+2. Loads the last open trade from SQLite
+3. Verifies the position on Binance
+4. Restores SL/TP orders if missing
+5. Resumes Discord updates
 
 ---
 
@@ -223,62 +213,97 @@ sudo systemctl daemon-reload   # If service file changed
    ```
    BINANCE_TESTNET=false
    ```
-2. Ensure your Binance API key has futures trading permissions enabled.
-3. Start with a small balance and monitor closely.
-4. Review confidence scores and backtesting results before going live.
+2. Ensure your Binance API key has futures trading permissions
+3. Start with a small balance
+4. Monitor closely during the first few trades
 
 ---
 
-## Troubleshooting
+## Project Structure
 
-### "BINANCE_API_KEY is required"
-- Create `.env` from `.env.example`
-- Fill in your Binance API key
-
-### "API key has no permissions"
-- Enable Futures trading in Binance API settings
-- Enable reading and trading permissions
-
-### Bot won't start
-- Check logs: `tail -f logs/application.log`
-- Check config: ensure `.env` has all required fields
-- Run: `./healthcheck.sh`
-
-### WebSocket disconnects
-- Handled automatically by the built-in reconnection logic.
-- Check network connectivity: `ping -c 3 google.com`
-
-### Discord rate limits
-- Bot updates every 30 seconds, well within Discord's limits.
-
-### "Address already in use" for API
-- Another process is using port 8080. Change `API_PORT` in `.env`.
-
-### Database errors
-- The bot uses SQLite with WAL mode for safe concurrent access.
-- If corrupted: `rm data/trades.db` (trades will be lost)
-
----
-
-## Recovery
-
-On restart, the bot automatically:
-
-1. Validates configuration before connecting to external services.
-2. Loads the last open trade from SQLite.
-3. Verifies the position on Binance.
-4. Restores SL/TP orders if missing from the exchange.
-5. Resumes Discord updates.
+```
+├── Dockerfile                 # Container build
+├── docker-compose.yml         # Docker deployment
+├── main.py                    # Entry point
+├── install.sh                 # Installation script
+├── start.sh                   # Startup script
+├── stop.sh                    # Stop script
+├── restart.sh                 # Restart script
+├── healthcheck.sh             # Runtime health check
+├── verify_install.sh          # Pre-startup verification
+├── trading-bot.service        # systemd unit file
+├── bot.service                # Legacy systemd file
+├── logrotate.conf             # Log rotation config
+├── .env.example               # Configuration template
+├── .gitattributes             # Git line-ending settings
+├── requirements.txt           # Python dependencies
+├── README.md                  # This file
+├── LICENSE                    # MIT License
+├── src/
+│   ├── bot.py                 # Main orchestrator
+│   ├── config/                # Settings from .env
+│   ├── exchange/              # Binance Futures REST + WebSocket
+│   ├── strategy/              # EMA crossover logic
+│   ├── discord_bot/           # Discord embed notifications
+│   ├── database/              # SQLite trade storage
+│   ├── models/                # Data classes
+│   ├── market_intelligence/   # OI, funding, Fear & Greed
+│   ├── news/                  # News sentiment analysis
+│   ├── confidence/            # Confidence scoring engine
+│   ├── ml/                    # ML dataset preparation
+│   ├── api/                   # REST API dashboard
+│   ├── backtesting/           # Backtesting engine
+│   ├── risk/                  # Risk management
+│   └── utils/                 # Logger, helpers
+├── data/                      # SQLite database
+└── logs/                      # Log files
+```
 
 ---
 
 ## Requirements
 
-- Python 3.12+
+- Python 3.10+ (recommended 3.12+)
 - Binance Futures account (testnet or live)
-- Discord application with bot token
-- Linux VPS (recommended: 1GB RAM, 1 vCPU)
-- Operating system: Ubuntu 22.04+ / Debian 11+
+- Discord bot token
+- Linux VPS (1GB RAM, 1 vCPU) or Docker
+- Ubuntu 22.04+ / Debian 11+ / any Docker host
+
+---
+
+## Troubleshooting
+
+### Clone hangs on Wispbyte/Pterodactyl
+Ensure the panel has outbound internet access to GitHub. If the panel uses Docker, try the Dockerfile instead of git clone.
+
+### "BINANCE_API_KEY is required"
+Create `.env` from `.env.example` and fill in your API key.
+
+### "API key has no permissions"
+Enable Futures trading in your Binance API settings.
+
+### Bot won't start
+```bash
+tail -f logs/application.log
+tail -f logs/error.log
+./verify_install.sh
+```
+
+### WebSocket keeps disconnecting
+The bot reconnects automatically. Check your network:
+```bash
+ping -c 3 google.com
+```
+
+### "Address already in use"
+Change `API_PORT` in `.env` to a different port.
+
+### Database errors
+The bot uses SQLite with safe WAL mode. If corrupted:
+```bash
+rm data/trades.db
+```
+(Trade history will be lost — the bot creates a fresh database.)
 
 ---
 

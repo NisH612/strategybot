@@ -1,0 +1,12 @@
+services:
+  trading-bot:
+    build: .
+    container_name: btc-trading-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "127.0.0.1:8080:8080"
