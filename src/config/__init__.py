@@ -75,7 +75,7 @@ class Settings:
     @property
     def wss_url(self) -> str:
         if self.testnet:
-            return "wss://stream.testnet.binancefuture.com/ws"
+            return "wss://stream.binancefuture.com/ws"
         return "wss://fstream.binance.com/ws"
 
     @property

@@ -280,19 +280,27 @@ class BinanceClient:
     ) -> None:
         uri = f"{self.settings.wss_url}/{stream_name}"
         logger.info("Connecting WebSocket: %s", uri)
-        async for ws in websockets.connect(
-            uri, ping_interval=20, ping_timeout=10, close_timeout=5
-        ):
+        while self._running:
             try:
-                async for raw in ws:
+                async for ws in websockets.connect(
+                    uri, ping_interval=20, ping_timeout=10, close_timeout=5
+                ):
+                    logger.info("WebSocket connected: %s", stream_name)
                     try:
-                        msg = json.loads(raw)
-                        await handler(msg)
-                    except Exception as exc:
-                        logger.exception("WS handler error: %s", exc)
-            except websockets.ConnectionClosed:
-                logger.warning("WebSocket disconnected, reconnecting...")
-                await asyncio.sleep(2)
+                        async for raw in ws:
+                            try:
+                                msg = json.loads(raw)
+                                await handler(msg)
+                            except Exception as exc:
+                                logger.exception("WS handler error: %s", exc)
+                    except websockets.ConnectionClosed:
+                        logger.warning("WebSocket disconnected (%s), reconnecting...", stream_name)
+            except (OSError, asyncio.TimeoutError) as exc:
+                logger.warning("WebSocket connection failed (%s): %s, retry in 5s", stream_name, exc)
+                await asyncio.sleep(5)
+            except Exception as exc:
+                logger.warning("WebSocket error (%s): %s, reconnecting in 5s", stream_name, exc)
+                await asyncio.sleep(5)
 
     async def _handle_kline(self, msg: dict) -> None:
         if self._on_kline:
